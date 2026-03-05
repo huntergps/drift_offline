@@ -1,0 +1,18 @@
+name: drift_offline_first_with_rest
+description: Offline-first repository and model base for REST APIs. Bridges drift_offline_first and drift_rest.
+version: 0.1.0
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  drift_offline_first:
+    path: ../drift_offline_first
+  drift_rest:
+    path: ../drift_rest
+  http: ">=1.0.0 <2.0.0"
+  logging: ">=1.0.0 <2.0.0"
+
+dev_dependencies:
+  lints:
+  test:

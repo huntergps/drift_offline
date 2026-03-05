@@ -1,0 +1,14 @@
+name: drift_odoo_core
+description: Interfaces, models, adapters, annotations and shared helpers for drift_odoo packages.
+version: 0.1.0
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  collection: ">=1.15.0 <2.0.0"
+  meta: ">=1.3.0 <2.0.0"
+
+dev_dependencies:
+  lints:
+  test:

@@ -1,0 +1,46 @@
+# Read about `build.yaml` at https://pub.dev/packages/build_config
+builders:
+  supabase_aggregate_builder:
+    import: "package:drift_offline_first_with_supabase_build/drift_offline_first_with_supabase_build.dart"
+    builder_factories: ["offlineFirstAggregateBuilder"]
+    build_extensions:
+      { "$lib$": ["models_and_migrations.supabase_aggregate.dart"] }
+    build_to: cache
+    applies_builders: ["source_gen|combining_builder"]
+    runs_before: ["supabase_model_dictionary_builder"]
+    auto_apply: dependents
+    defaults:
+      generate_for:
+        exclude:
+          - lib/supabase/adapters/*.dart
+          - supabase/adapters/*.dart
+
+  supabase_adapters_builder:
+    import: "package:drift_offline_first_with_supabase_build/drift_offline_first_with_supabase_build.dart"
+    builder_factories: ["offlineFirstAdaptersBuilder"]
+    build_extensions: { ".model.dart": [".adapter_build_supabase.dart"] }
+    build_to: cache
+    auto_apply: dependents
+    applies_builders: ["source_gen|combining_builder"]
+    defaults:
+      generate_for:
+        include:
+          - lib/**/*.model.dart
+          - lib/supabase/supabase.g.dart
+        exclude:
+          - lib/supabase/adapters/*.dart
+          - supabase/adapters/*.dart
+
+  supabase_model_dictionary_builder:
+    import: "package:drift_offline_first_with_supabase_build/drift_offline_first_with_supabase_build.dart"
+    builder_factories: ["offlineFirstModelDictionaryBuilder"]
+    build_extensions:
+      {
+        ".supabase_aggregate.dart":
+          [".supabase_aggregate.model_dictionary_build_supabase.dart"],
+      }
+    build_to: cache
+    auto_apply: dependents
+    required_inputs: [".supabase_aggregate.dart"]
+    applies_builders:
+      ["source_gen|combining_builder", ":supabase_aggregate_builder"]

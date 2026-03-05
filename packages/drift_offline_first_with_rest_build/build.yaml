@@ -1,0 +1,37 @@
+builders:
+  # 1. Aggregate all @ConnectOfflineFirstWithRest annotations into a single file
+  #    that the adapter and dictionary builders can read.
+  rest_aggregate_builder:
+    import: "package:drift_offline_first_with_rest_build/drift_offline_first_with_rest_build.dart"
+    builder_factories: ["restAggregateBuilder"]
+    build_extensions:
+      lib/$lib$:
+        - lib/app/brick.g.dart
+    auto_apply: dependents
+    build_to: source
+    required_inputs:
+      - $lib$
+
+  # 2. Generate a RestAdapter subclass for each annotated model.
+  rest_adapters_builder:
+    import: "package:drift_offline_first_with_rest_build/drift_offline_first_with_rest_build.dart"
+    builder_factories: ["restAdaptersBuilder"]
+    build_extensions:
+      "{{}}.dart":
+        - "{{}}.rest.dart"
+    auto_apply: dependents
+    build_to: source
+    required_inputs:
+      - $lib$
+
+  # 3. Generate restMappings and restModelDictionary constants.
+  rest_model_dictionary_builder:
+    import: "package:drift_offline_first_with_rest_build/drift_offline_first_with_rest_build.dart"
+    builder_factories: ["restModelDictionaryBuilder"]
+    build_extensions:
+      lib/$lib$:
+        - lib/app/rest.g.dart
+    auto_apply: dependents
+    build_to: source
+    required_inputs:
+      - lib/app/brick.g.dart

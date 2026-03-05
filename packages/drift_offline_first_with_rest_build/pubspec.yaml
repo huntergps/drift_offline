@@ -1,0 +1,25 @@
+name: drift_offline_first_with_rest_build
+description: Build system for drift_offline_first_with_rest. Generates REST adapters and the restModelDictionary.
+version: 0.1.0
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  analyzer: ">=6.0.0 <8.0.0"
+  brick_build: ">=3.0.0 <4.0.0"
+  brick_core: ">=1.0.0 <2.0.0"
+  build: ">=2.0.0 <3.0.0"
+  dart_style: ">=2.0.0 <3.0.0"
+  drift_offline_first_with_rest:
+    path: ../drift_offline_first_with_rest
+  drift_rest:
+    path: ../drift_rest
+  drift_rest_generators:
+    path: ../drift_rest_generators
+  source_gen: ">=1.0.0 <2.0.0"
+
+dev_dependencies:
+  build_runner: ">=2.0.0 <3.0.0"
+  lints:
+  test:

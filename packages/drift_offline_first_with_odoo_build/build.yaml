@@ -1,0 +1,46 @@
+# Read about `build.yaml` at https://pub.dev/packages/build_config
+builders:
+  odoo_aggregate_builder:
+    import: "package:drift_offline_first_with_odoo_build/drift_offline_first_with_odoo_build.dart"
+    builder_factories: ["offlineFirstAggregateBuilder"]
+    build_extensions:
+      { "$lib$": ["models_and_migrations.odoo_aggregate.dart"] }
+    build_to: cache
+    applies_builders: ["source_gen|combining_builder"]
+    runs_before: ["odoo_model_dictionary_builder"]
+    auto_apply: dependents
+    defaults:
+      generate_for:
+        exclude:
+          - lib/odoo/adapters/*.dart
+          - odoo/adapters/*.dart
+
+  odoo_adapters_builder:
+    import: "package:drift_offline_first_with_odoo_build/drift_offline_first_with_odoo_build.dart"
+    builder_factories: ["offlineFirstAdaptersBuilder"]
+    build_extensions: { ".model.dart": [".adapter_build_odoo.dart"] }
+    build_to: cache
+    auto_apply: dependents
+    applies_builders: ["source_gen|combining_builder"]
+    defaults:
+      generate_for:
+        include:
+          - lib/**/*.model.dart
+          - lib/odoo/odoo.g.dart
+        exclude:
+          - lib/odoo/adapters/*.dart
+          - odoo/adapters/*.dart
+
+  odoo_model_dictionary_builder:
+    import: "package:drift_offline_first_with_odoo_build/drift_offline_first_with_odoo_build.dart"
+    builder_factories: ["offlineFirstModelDictionaryBuilder"]
+    build_extensions:
+      {
+        ".odoo_aggregate.dart":
+          [".odoo_aggregate.model_dictionary_build_odoo.dart"],
+      }
+    build_to: cache
+    auto_apply: dependents
+    required_inputs: [".odoo_aggregate.dart"]
+    applies_builders:
+      ["source_gen|combining_builder", ":odoo_aggregate_builder"]
