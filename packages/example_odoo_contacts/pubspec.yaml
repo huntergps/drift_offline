@@ -1,0 +1,29 @@
+name: example_odoo_contacts
+description: >
+  Minimal working example of drift_offline_first_with_odoo.
+  Shows how to define a model, wire up a Drift database, and use the
+  offline-first repository to sync Odoo res.partner records.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  drift: ">=2.0.0 <3.0.0"
+  drift_odoo:
+    path: ../drift_odoo
+  drift_odoo_core:
+    path: ../drift_odoo_core
+  drift_offline_first:
+    path: ../drift_offline_first
+  drift_offline_first_with_odoo:
+    path: ../drift_offline_first_with_odoo
+  logging: ">=1.0.0 <2.0.0"
+
+dev_dependencies:
+  drift_dev: ">=2.0.0 <3.0.0"
+  # drift_offline_first_with_odoo_build:
+  #   path: ../drift_offline_first_with_odoo_build
+  build_runner: ">=2.0.0 <3.0.0"
+  sqflite_common_ffi: ">=2.3.0 <3.0.0"

@@ -1,6 +1,6 @@
 import 'package:analyzer/dart/element/element.dart';
-import 'package:brick_build/generators.dart';
 import 'package:brick_core/field_rename.dart';
+import 'package:drift_build/generators.dart';
 import 'package:drift_odoo_core/drift_odoo_core.dart';
 
 import 'src/odoo_deserialize.dart';
@@ -11,12 +11,10 @@ import 'src/odoo_serialize.dart';
 /// [OdooDeserialize] and [OdooSerialize] generators for the annotated class.
 class OdooModelSerdesGenerator
     extends ProviderSerializableGenerator<OdooSerializable> {
-  final String? repositoryName;
-
   OdooModelSerdesGenerator(
     super.element,
     super.reader, {
-    this.repositoryName,
+    super.repositoryName,
   }) : super(configKey: 'odooConfig');
 
   @override
@@ -40,7 +38,7 @@ class OdooModelSerdesGenerator
   }
 
   @override
-  List<SerdesGenerator> get generators {
+  List<SerdesGenerator<dynamic>> get generators {
     final classElement = element as ClassElement;
     final fields = OdooFields(classElement, config);
     return [

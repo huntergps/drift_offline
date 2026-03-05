@@ -1,8 +1,9 @@
 name: drift_offline
-repository: https://github.com/yourorg/drift_offline
+repository: https://github.com/huntergps/drift_offline
 
 packages:
   - packages/*
+  - packages/drift_build
 
 command:
   version:
@@ -14,8 +15,17 @@ command:
 
 scripts:
   analyze:
-    run: melos exec -- dart analyze .
-    description: Run dart analyzer on all packages
+    run: >
+      melos exec
+      --ignore="drift_rest_generators"
+      --ignore="drift_supabase_generators"
+      --ignore="drift_offline_first_with_rest_build"
+      --ignore="drift_offline_first_with_supabase_build"
+      --ignore="drift_supabase"
+      --ignore="drift_offline_first_with_supabase"
+      --ignore="example_odoo_contacts"
+      -- dart analyze .
+    description: Run dart analyzer on stable packages (REST/Supabase generators, Supabase provider, and example app are WIP)
 
   test:
     run: melos exec -- dart test

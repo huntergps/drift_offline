@@ -1,4 +1,4 @@
-import 'package:brick_build/generators.dart';
+import 'package:drift_build/generators.dart';
 
 /// Generates the `supabaseModelDictionary` and mappings file (`supabase.g.dart`).
 class OfflineFirstModelDictionaryGenerator extends ModelDictionaryGenerator {

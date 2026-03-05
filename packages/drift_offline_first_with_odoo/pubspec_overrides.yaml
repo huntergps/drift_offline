@@ -1,0 +1,8 @@
+# melos_managed_dependency_overrides: drift_odoo,drift_odoo_core,drift_offline_first
+dependency_overrides:
+  drift_odoo:
+    path: ../drift_odoo
+  drift_odoo_core:
+    path: ../drift_odoo_core
+  drift_offline_first:
+    path: ../drift_offline_first

@@ -18,8 +18,8 @@ const kColLocked = 'locked';
 
 /// Manages the SQLite-backed offline queue for Odoo requests.
 ///
-/// Uses a separate SQLite database file (default: `odoo_offline_queue.sqlite`)
-/// to persist pending mutations (create, write, unlink) across app restarts.
+/// Uses a separate SQLite database file to persist pending mutations
+/// (create, write, unlink) across app restarts.
 class OdooRequestSqliteCacheManager {
   final String databaseName;
   final DatabaseFactory databaseFactory;
@@ -67,7 +67,9 @@ class OdooRequestSqliteCacheManager {
   }
 
   /// Insert a new pending job or increment attempts if it already exists.
-  Future<void> insertOrUpdate({
+  ///
+  /// Returns the row ID of the inserted or updated job.
+  Future<int> insertOrUpdate({
     required String model,
     required String method,
     required String ids,
@@ -75,20 +77,21 @@ class OdooRequestSqliteCacheManager {
     Logger? logger,
   }) async {
     final db = await getDb();
-    await _lock.synchronized(() async {
+    return _lock.synchronized(() async {
       final now = DateTime.now().millisecondsSinceEpoch;
 
-      // Check for duplicate (same model + method + ids + payload)
       final existing = await db.query(
         kQueueTable,
-        where: '$kColModel = ? AND $kColMethod = ? AND $kColIds = ? AND $kColPayload = ?',
+        columns: [kColId, kColAttempts],
+        where:
+            '$kColModel = ? AND $kColMethod = ? AND $kColIds = ? AND $kColPayload = ?',
         whereArgs: [model, method, ids, payload],
         limit: 1,
       );
 
       if (existing.isEmpty) {
         logger?.fine('OdooQueue: adding $method $model ids=$ids');
-        await db.insert(kQueueTable, {
+        return db.insert(kQueueTable, {
           kColModel: model,
           kColMethod: method,
           kColIds: ids,
@@ -100,14 +103,16 @@ class OdooRequestSqliteCacheManager {
         });
       } else {
         final row = existing.first;
+        final rowId = row[kColId] as int;
         final attempt = (row[kColAttempts] as int) + 1;
         logger?.warning('OdooQueue: attempt #$attempt for $method $model');
         await db.update(
           kQueueTable,
           {kColAttempts: attempt, kColUpdatedAt: now, kColLocked: 1},
           where: '$kColId = ?',
-          whereArgs: [row[kColId]],
+          whereArgs: [rowId],
         );
+        return rowId;
       }
     });
   }
@@ -133,15 +138,15 @@ class OdooRequestSqliteCacheManager {
   /// Fetch and lock the next pending job. Returns `null` if queue is empty.
   Future<Map<String, dynamic>?> prepareNextRequestToProcess() async {
     final db = await getDb();
-    return await _lock.synchronized(() async {
-      final nowMinusPoll =
-          DateTime.now().millisecondsSinceEpoch - processingInterval.inMilliseconds;
-
-      // Auto-unlock stale locks (>2 minutes old)
+    return _lock.synchronized(() async {
+      // Auto-unlock stale locks (locked for more than 2 minutes).
+      final staleThreshold =
+          DateTime.now().millisecondsSinceEpoch - const Duration(minutes: 2).inMilliseconds;
       final stale = await db.query(
         kQueueTable,
+        columns: [kColId],
         where: '$kColLocked = 1 AND $kColUpdatedAt < ?',
-        whereArgs: [DateTime.now().millisecondsSinceEpoch - const Duration(minutes: 2).inMilliseconds],
+        whereArgs: [staleThreshold],
       );
       for (final row in stale) {
         await db.update(
@@ -153,15 +158,17 @@ class OdooRequestSqliteCacheManager {
       }
 
       if (serialProcessing) {
-        // Block if any locked job exists
         final locked = await db.query(
           kQueueTable,
+          columns: [kColId],
           where: '$kColLocked = 1',
           limit: 1,
         );
         if (locked.isNotEmpty) return null;
       }
 
+      final nowMinusPoll =
+          DateTime.now().millisecondsSinceEpoch - processingInterval.inMilliseconds;
       final rows = await db.query(
         kQueueTable,
         where: '$kColLocked = 0 AND $kColCreatedAt <= ?',
@@ -184,7 +191,7 @@ class OdooRequestSqliteCacheManager {
     });
   }
 
-  /// All unprocessed jobs (for inspection/debugging).
+  /// All jobs in the queue ordered by creation time (for inspection/debugging).
   Future<List<Map<String, dynamic>>> unprocessedRequests() async {
     final db = await getDb();
     return db.query(kQueueTable, orderBy: '$kColCreatedAt ASC');

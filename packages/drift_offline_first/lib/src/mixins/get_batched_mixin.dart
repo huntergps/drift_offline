@@ -3,6 +3,7 @@ import '../offline_first_policy.dart';
 import '../offline_first_repository.dart';
 import '../query/limit_by.dart';
 import '../query/query.dart';
+import '../query/query_action.dart';
 
 /// Adds a [getBatched] convenience method that fetches [T] in pages.
 ///

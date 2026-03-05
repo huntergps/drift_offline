@@ -1,5 +1,5 @@
 import 'package:analyzer/dart/element/element.dart';
-import 'package:brick_build/generators.dart';
+import 'package:drift_build/generators.dart';
 import 'package:brick_core/field_rename.dart';
 import 'package:drift_rest/drift_rest.dart';
 import 'package:source_gen/source_gen.dart';

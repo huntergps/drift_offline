@@ -5,6 +5,8 @@ version: 0.1.0
 environment:
   sdk: ">=3.4.0 <4.0.0"
 
+publish_to: none
+
 dependencies:
   drift_odoo_core:
     path: ../drift_odoo_core
@@ -22,4 +24,5 @@ dependencies:
 dev_dependencies:
   drift_dev: ">=2.0.0 <3.0.0"
   lints:
-  test:
+  sqflite_common_ffi: ">=2.3.0 <3.0.0"
+  test: ">=1.24.0 <2.0.0"

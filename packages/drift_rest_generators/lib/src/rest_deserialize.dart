@@ -1,4 +1,4 @@
-import 'package:brick_build/generators.dart';
+import 'package:drift_build/generators.dart';
 import 'package:brick_json_generators/brick_json_generators.dart';
 import 'package:drift_rest/drift_rest.dart';
 

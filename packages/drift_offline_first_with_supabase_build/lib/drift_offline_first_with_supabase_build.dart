@@ -1,4 +1,4 @@
-import 'package:brick_build/builders.dart';
+import 'package:drift_build/builders.dart';
 import 'package:build/build.dart';
 import 'package:drift_offline_first_with_supabase/drift_offline_first_with_supabase.dart';
 

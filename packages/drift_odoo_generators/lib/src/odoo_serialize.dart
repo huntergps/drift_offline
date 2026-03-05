@@ -1,16 +1,15 @@
 import 'package:analyzer/dart/element/element.dart';
-import 'package:brick_build/generators.dart';
+import 'package:drift_build/generators.dart';
 import 'package:drift_odoo_core/drift_odoo_core.dart';
 
-import 'odoo_fields.dart';
 import 'odoo_serdes_generator.dart';
 
 /// Generates the `toOdoo(instance)` function for a model.
 ///
 /// The output map is used as kwargs for `create` or `write`.
-/// The `id` field is excluded (managed by the repository).
+/// The `id` field must NOT be included (managed by the repository).
 /// Many2one fields are serialized as their [odooId].
-/// One2many/Many2many use OdooCommand tuples.
+/// One2many / Many2many use [OdooCommand] tuples.
 class OdooSerialize extends OdooSerdesGenerator {
   OdooSerialize(
     super.element,
@@ -24,11 +23,10 @@ class OdooSerialize extends OdooSerdesGenerator {
   @override
   String? coderForField(
     FieldElement field,
-    SharedChecker<OdooModel> checker, {
+    SharedChecker<dynamic> checker, {
     required bool wrappedInFuture,
     required Odoo fieldAnnotation,
   }) {
-    final fieldName = odooFieldName(field, fieldAnnotation);
     final fieldValue = 'instance.${field.name}';
 
     if (fieldAnnotation.toGenerator != null) {
@@ -38,15 +36,16 @@ class OdooSerialize extends OdooSerdesGenerator {
     // DateTime → 'YYYY-MM-DD HH:MM:SS' (UTC, Odoo format)
     if (checker.isDateTime) {
       final nullable = checker.isNullable ? '?' : '';
-      return '$fieldValue$nullable.toUtc().toIso8601String().replaceFirst(\'T\', \' \').substring(0, 19)';
+      return "$fieldValue$nullable"
+          ".toUtc().toIso8601String().replaceFirst('T', ' ').substring(0, 19)";
     }
 
-    // bool → bool (Odoo accepts native bool)
+    // bool — pass through
     if (checker.isBool) {
       return fieldValue;
     }
 
-    // Primitive types — pass through
+    // Primitive types
     if (checker.isDartCoreType) {
       return fieldValue;
     }
@@ -56,25 +55,25 @@ class OdooSerialize extends OdooSerdesGenerator {
       final enumType = checker.unFuturedType.toString().replaceAll('?', '');
       if (fieldAnnotation.enumAsString) {
         final nullable = checker.isNullable ? '?' : '';
-        return '$fieldValue$nullable.name';
+        return "$fieldValue$nullable.name";
       } else {
         if (checker.isNullable) {
-          return '$fieldValue != null ? $enumType.values.indexOf($fieldValue!) : null';
+          return "$fieldValue != null ? $enumType.values.indexOf($fieldValue!) : null";
         }
-        return '$enumType.values.indexOf($fieldValue)';
+        return "$enumType.values.indexOf($fieldValue)";
       }
     }
 
-    // Map
+    // Map — pass through
     if (checker.isMap) {
       return fieldValue;
     }
 
-    // Iterable (One2many / Many2many siblings)
+    // Iterable (One2many / Many2many siblings) → OdooCommand.link tuples
     if (checker.isIterable) {
       if (checker.isArgTypeASibling) {
         final nullable = checker.isNullable ? '?' : '';
-        return '$fieldValue$nullable.map((s) => OdooCommand.link(s.odooId!)).toList()';
+        return "$fieldValue$nullable.map((s) => OdooCommand.link(s.odooId!)).toList()";
       }
       return fieldValue;
     }
@@ -82,7 +81,7 @@ class OdooSerialize extends OdooSerdesGenerator {
     // Many2one sibling → send the odooId
     if (checker.isSibling) {
       final nullable = checker.isNullable ? '?' : '';
-      return '$fieldValue$nullable.odooId';
+      return "$fieldValue$nullable.odooId";
     }
 
     return fieldValue;

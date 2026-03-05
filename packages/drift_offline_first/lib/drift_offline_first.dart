@@ -1,3 +1,4 @@
+export 'src/annotations/offline_first.dart';
 export 'src/memory_cache_provider.dart';
 export 'src/mixins/delete_all_mixin.dart';
 export 'src/mixins/destructive_local_sync_from_remote_mixin.dart';

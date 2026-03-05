@@ -5,9 +5,12 @@ version: 0.1.0
 environment:
   sdk: ">=3.4.0 <4.0.0"
 
+publish_to: none
+
 dependencies:
   analyzer: ">=6.0.0 <8.0.0"
-  brick_build: ">=3.0.0 <4.0.0"
+  drift_build:
+    path: ../drift_build
   brick_core: ">=1.0.0 <2.0.0"
   brick_json_generators: ">=3.0.0 <4.0.0"
   build: ">=2.0.0 <3.0.0"

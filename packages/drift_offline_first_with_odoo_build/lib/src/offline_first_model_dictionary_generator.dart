@@ -1,4 +1,4 @@
-import 'package:brick_build/generators.dart';
+import 'package:drift_build/generators.dart';
 
 /// Generates the `odooModelDictionary` and mappings file (`odoo.g.dart`).
 class OfflineFirstModelDictionaryGenerator extends ModelDictionaryGenerator {
@@ -6,11 +6,10 @@ class OfflineFirstModelDictionaryGenerator extends ModelDictionaryGenerator {
   String get requiredImports => """
 // ignore: unused_import
 import 'dart:convert';
-import 'package:drift_odoo/drift_odoo.dart' show OdooOfflineQueueClient;
+import 'package:drift_odoo/drift_odoo.dart' show OdooOfflineQueueClient, OdooCommand;
 import 'package:drift_odoo_core/drift_odoo_core.dart' show OdooModel, OdooAdapter, OdooModelDictionary;
 import 'package:drift_offline_first_with_odoo/drift_offline_first_with_odoo.dart'
-    show OfflineFirstWithOdooRepository, OfflineFirstWithOdooAdapter;
-import 'package:drift_odoo/drift_odoo.dart' show OdooCommand;""";
+    show OfflineFirstWithOdooRepository, OfflineFirstWithOdooAdapter;""";
 
   const OfflineFirstModelDictionaryGenerator();
 
@@ -21,7 +20,7 @@ import 'package:drift_odoo/drift_odoo.dart' show OdooCommand;""";
     final models = modelsFromFiles(classNamesToFileNames);
 
     return '''
-${ModelDictionaryGenerator.HEADER}
+${ModelDictionaryGenerator.headerComment}
 $requiredImports
 
 $models

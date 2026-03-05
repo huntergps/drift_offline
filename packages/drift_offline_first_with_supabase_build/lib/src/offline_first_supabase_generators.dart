@@ -1,5 +1,5 @@
 import 'package:analyzer/dart/element/element.dart';
-import 'package:brick_build/generators.dart';
+import 'package:drift_build/generators.dart';
 import 'package:drift_offline_first_with_supabase/drift_offline_first_with_supabase.dart';
 import 'package:drift_supabase/drift_supabase.dart';
 import 'package:drift_supabase_generators/generators.dart';

@@ -51,9 +51,8 @@ class HttpRequestSqliteCacheManager {
   /// Return the database name (used for logging).
   String get databaseName => databasePath;
 
-  Future<Database> getDb() {
-    _db ??= databaseFactory.openDatabase(databasePath);
-    return _db!;
+  Future<Database> getDb() async {
+    return _db ??= await databaseFactory.openDatabase(databasePath);
   }
 
   /// Create the jobs table if it does not exist.

@@ -40,6 +40,10 @@ class Rest implements FieldSerializable {
   @override
   final String? toGenerator;
 
+  @Deprecated('Use a nullable type instead')
+  @override
+  bool get nullable => false;
+
   const Rest({
     this.name,
     bool? ignore,

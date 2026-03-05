@@ -1,5 +1,5 @@
-import 'package:brick_build/builders.dart';
 import 'package:build/build.dart';
+import 'package:drift_build/builders.dart';
 import 'package:drift_offline_first_with_odoo/drift_offline_first_with_odoo.dart';
 
 import 'src/offline_first_model_dictionary_generator.dart';
@@ -22,7 +22,7 @@ Builder offlineFirstAggregateBuilder(BuilderOptions options) =>
 
 /// Generates `*_adapter.g.dart` files with fromOdoo/toOdoo for each model.
 Builder offlineFirstAdaptersBuilder(BuilderOptions options) =>
-    AdapterBuilder<ConnectOfflineFirstWithOdoo>(_generator);
+    adapterBuilder(_generator);
 
 /// Generates `odoo.g.dart` with `odooMappings` and `odooModelDictionary`.
 Builder offlineFirstModelDictionaryBuilder(BuilderOptions options) =>

@@ -1,20 +1,25 @@
 import 'package:analyzer/dart/element/element.dart';
-import 'package:brick_build/generators.dart';
+import 'package:drift_build/generators.dart';
 import 'package:drift_odoo_core/drift_odoo_core.dart';
-
-import 'odoo_fields.dart';
+import 'package:source_gen/source_gen.dart';
 
 /// Base serdes generator for Odoo JSON-2 serialization.
-abstract class OdooSerdesGenerator extends SerdesGenerator<Odoo, OdooModel> {
+abstract class OdooSerdesGenerator extends SerdesGenerator<Odoo> {
   @override
   final String providerName = 'Odoo';
 
   @override
+  final String providerClassName = 'OdooOfflineQueueClient';
+
+  @override
   final String repositoryName;
 
+  @override
+  TypeChecker get siblingsChecker => TypeChecker.fromRuntime(OdooModel);
+
   OdooSerdesGenerator(
-    ClassElement super.element,
-    OdooFields super.fields, {
+    super.element,
+    super.fields, {
     required this.repositoryName,
   });
 
@@ -24,7 +29,7 @@ abstract class OdooSerdesGenerator extends SerdesGenerator<Odoo, OdooModel> {
   @override
   String get serializeOutputType => 'Map<String, dynamic>';
 
-  /// Convert Dart field name to Odoo field name using annotation or config.
+  /// Returns the Odoo field name for [field] from its annotation.
   String odooFieldName(FieldElement field, Odoo annotation) {
     return annotation.name ?? field.name;
   }

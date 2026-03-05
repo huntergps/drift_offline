@@ -1,6 +1,5 @@
 import 'package:analyzer/dart/element/element.dart';
-import 'package:brick_build/generators.dart';
-import 'package:brick_core/field_rename.dart';
+import 'package:drift_build/generators.dart';
 import 'package:drift_odoo_core/drift_odoo_core.dart';
 
 /// Reads the `@Odoo(...)` annotation from a field element.
@@ -17,7 +16,7 @@ class OdooAnnotationFinder extends AnnotationFinder<Odoo>
     if (obj == null) {
       return Odoo(
         name: renameField(
-          element.name!,
+          element.name,
           config?.fieldRename,
           OdooSerializable.defaults.fieldRename,
         ),
@@ -25,35 +24,29 @@ class OdooAnnotationFinder extends AnnotationFinder<Odoo>
     }
 
     return Odoo(
-      defaultValue: obj.getField('defaultValue')?.toStringValue(),
-      enumAsString: obj.getField('enumAsString')?.toBoolValue() ?? Odoo.defaults.enumAsString,
-      fromGenerator: obj.getField('fromGenerator')?.toStringValue(),
-      ignore: obj.getField('ignore')?.toBoolValue() ?? Odoo.defaults.ignore,
-      ignoreFrom: obj.getField('ignoreFrom')?.toBoolValue() ?? Odoo.defaults.ignoreFrom,
-      ignoreTo: obj.getField('ignoreTo')?.toBoolValue() ?? Odoo.defaults.ignoreTo,
-      name: obj.getField('name')?.toStringValue() ??
+      defaultValue: obj.peek('defaultValue')?.stringValue,
+      enumAsString:
+          obj.peek('enumAsString')?.boolValue ?? Odoo.defaults.enumAsString,
+      fromGenerator: obj.peek('fromGenerator')?.stringValue,
+      ignore: obj.peek('ignore')?.boolValue ?? Odoo.defaults.ignore,
+      ignoreFrom:
+          obj.peek('ignoreFrom')?.boolValue ?? Odoo.defaults.ignoreFrom,
+      ignoreTo: obj.peek('ignoreTo')?.boolValue ?? Odoo.defaults.ignoreTo,
+      name: obj.peek('name')?.stringValue ??
           renameField(
-            element.name!,
+            element.name,
             config?.fieldRename,
             OdooSerializable.defaults.fieldRename,
           ),
-      toGenerator: obj.getField('toGenerator')?.toStringValue(),
+      toGenerator: obj.peek('toGenerator')?.stringValue,
     );
   }
 }
 
-/// Collects all `@Odoo` annotations for a class.
+/// Collects all `@Odoo`-annotated (or unannotated) fields for a class.
 class OdooFields extends FieldsForClass<Odoo> {
-  @override
-  final OdooAnnotationFinder finder;
-
   final OdooSerializable? config;
 
   OdooFields(ClassElement element, [this.config])
-      : finder = OdooAnnotationFinder(config),
-        super(element: element);
-}
-
-extension on OdooSerializable {
-  FieldRename get fieldRename => this.fieldRename;
+      : super(element: element, finder: OdooAnnotationFinder(config));
 }

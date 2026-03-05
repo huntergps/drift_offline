@@ -1,4 +1,4 @@
-import 'package:brick_build/generators.dart';
+import 'package:drift_build/generators.dart';
 import 'package:drift_offline_first_with_rest/drift_offline_first_with_rest.dart';
 import 'package:drift_rest/drift_rest.dart';
 import 'package:source_gen/source_gen.dart';

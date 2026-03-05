@@ -1,6 +1,7 @@
 import 'package:analyzer/dart/element/element.dart';
-import 'package:brick_build/generators.dart';
+import 'package:drift_build/generators.dart';
 import 'package:drift_offline_first_with_odoo/drift_offline_first_with_odoo.dart';
+import 'package:source_gen/source_gen.dart';
 
 import 'offline_first_odoo_generators.dart';
 
@@ -20,7 +21,7 @@ class OfflineFirstWithOdooGenerator
         superAdapterName = superAdapterName ?? 'OfflineFirstWithOdoo';
 
   @override
-  List<SerdesGenerator> buildGenerators(
+  List<SerdesGenerator<dynamic>> buildGenerators(
     Element element,
     ConstantReader annotation,
   ) {

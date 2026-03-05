@@ -1,5 +1,5 @@
 import 'package:analyzer/dart/element/element.dart';
-import 'package:brick_build/generators.dart';
+import 'package:drift_build/generators.dart';
 import 'package:drift_supabase/drift_supabase.dart';
 
 /// Finds `@Supabase` on a field element and returns its configuration.

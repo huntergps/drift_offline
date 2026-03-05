@@ -43,9 +43,8 @@ class Where extends WhereCondition {
   });
 
   /// Shorthand for [Compare.exact].
-  const Where.exact(String field, dynamic value)
+  const Where.exact(String field, this.value)
       : evaluatedField = field,
-        value = value,
         compare = Compare.exact,
         conditions = const [];
 

@@ -5,8 +5,10 @@ version: 0.1.0
 environment:
   sdk: ">=3.4.0 <4.0.0"
 
+publish_to: none
+
 dependencies:
-  brick_core: ">=1.0.0 <2.0.0"
+  brick_core: ">=1.0.0 <3.0.0"
   collection: ">=1.15.0 <2.0.0"
   drift_offline_first:
     path: ../drift_offline_first

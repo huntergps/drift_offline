@@ -22,4 +22,7 @@ abstract class OfflineFirstWithOdooModel extends OfflineFirstModel
   int? odooId;
 
   OfflineFirstWithOdooModel({this.odooId});
+
+  @override
+  Object? get primaryKey => odooId;
 }

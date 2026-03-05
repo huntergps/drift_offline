@@ -6,8 +6,8 @@ import 'package:drift_offline_first/src/query/query.dart';
 /// Mixin that adds a destructive sync strategy: local records missing from
 /// the remote are deleted locally.
 ///
-/// Use this for models where Odoo uses hard deletes (`unlink`) rather than
-/// archiving (`active = false`).
+/// Use this for models where the remote uses hard deletes rather than soft
+/// archiving. Comparison is done via [OfflineFirstModel.primaryKey].
 ///
 /// **Warning**: Requires fetching ALL remote records, so avoid using this for
 /// large datasets without a restricting [query].
@@ -38,10 +38,10 @@ mixin DestructiveLocalSyncFromRemoteMixin<TModel extends OfflineFirstModel>
     logger.finest('#destructiveLocalSyncFromRemote: $T query=$query');
 
     final remoteResults = await hydrateRemote<T>(query: query);
-    final remoteIds = remoteResults.map((r) => r.odooId).whereType<int>().toSet();
+    final remoteIds = remoteResults.map((r) => r.primaryKey).whereType<Object>().toSet();
 
     final localResults = await getLocal<T>(query: query);
-    final toDelete = localResults.where((r) => !remoteIds.contains(r.odooId));
+    final toDelete = localResults.where((r) => !remoteIds.contains(r.primaryKey));
 
     for (final deletable in toDelete) {
       await deleteLocal(deletable);
