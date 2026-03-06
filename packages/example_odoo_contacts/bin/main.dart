@@ -53,12 +53,16 @@ void main() async {
   // Wrap with offline-queue support: mutations are persisted to SQLite and
   // retried when connectivity is restored.
   final queuedClient = OdooOfflineQueueClient(
-    client: rawClient,
+    inner: rawClient,
     // Use a dedicated database file for the queue in production:
     // requestManager: OdooRequestSqliteCacheManager(
-    //   NativeDatabase.createInBackground(File('offline_queue.db')),
+    //   'offline_queue.db',
+    //   databaseFactory: databaseFactory,
     // ),
-    requestManager: OdooRequestSqliteCacheManager(NativeDatabase.memory()),
+    requestManager: OdooRequestSqliteCacheManager(
+      inMemoryDatabasePath,
+      databaseFactory: databaseFactoryFfi,
+    ),
   );
 
   // ── SyncManager ────────────────────────────────────────────────────────────

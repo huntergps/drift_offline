@@ -18,4 +18,5 @@ export 'src/query/limit_by.dart';
 export 'src/query/order_by.dart';
 export 'src/query/query.dart';
 export 'src/query/query_action.dart';
+export 'src/query/query_drift_transformer.dart';
 export 'src/query/where.dart';

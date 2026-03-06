@@ -11,13 +11,22 @@ const _colLastSync = 'last_sync_at';
 /// Persists the last successful sync timestamp per Odoo model.
 /// Used by [OfflineFirstWithOdooRepository.hydrateRemote] for incremental sync.
 ///
-/// Provide a [QueryExecutor] backed by a dedicated database file, e.g.:
-///
+/// **Option A — dedicated database file (recommended for production):**
 /// ```dart
 /// final syncManager = OdooSyncManager(
 ///   NativeDatabase.createInBackground(File('odoo_sync_state.sqlite')),
 /// );
 /// ```
+///
+/// **Option B — reuse the main app Drift database** to keep everything in one
+/// file (simpler setup, acceptable for most apps):
+/// ```dart
+/// // AppDatabase is your @DriftDatabase class.
+/// final appDb = AppDatabase(NativeDatabase.createInBackground(File('app.db')));
+/// final syncManager = OdooSyncManager(appDb.executor);
+/// ```
+/// `OdooSyncManager` creates its own `odoo_sync_state` table inside whatever
+/// [QueryExecutor] you provide, so it coexists safely with Drift-managed tables.
 ///
 /// All database access uses the Drift [QueryExecutor] API — no sqflite_common
 /// types are imported by this file.

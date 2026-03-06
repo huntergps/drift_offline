@@ -1,11 +1,14 @@
 name: drift_odoo_generators
 description: Code generation library for Odoo adapters (fromOdoo/toOdoo) and model dictionary.
 version: 0.1.0
+homepage: https://github.com/huntergps/drift_offline
+repository: https://github.com/huntergps/drift_offline
+issue_tracker: https://github.com/huntergps/drift_offline/issues
+# publish_to: none — path: dependencies must be replaced with version refs before publishing.
+publish_to: none
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
-
-publish_to: none
 
 dependencies:
   analyzer: ">=6.0.0 <9.0.0"
@@ -17,6 +20,8 @@ dependencies:
   dart_style: ">=2.0.0 <4.0.0"
   drift_odoo_core:
     path: ../drift_odoo_core
+  drift_offline_first:
+    path: ../drift_offline_first
   meta: ">=1.3.0 <2.0.0"
   source_gen: ">=1.0.0 <5.0.0"
 

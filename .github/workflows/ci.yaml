@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    name: Test (${{ matrix.package }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          # Core Odoo offline-first packages (stable, required to pass)
+          - drift_build
+          - drift_odoo_core
+          - drift_odoo
+          - drift_offline_first
+          - drift_offline_first_with_odoo
+          - drift_offline_first_with_odoo_build
+          - drift_odoo_generators
+          # REST backend packages
+          - drift_rest
+          - drift_rest_generators
+          - drift_offline_first_with_rest
+          - drift_offline_first_with_rest_build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install melos
+        run: dart pub global activate melos
+
+      - name: Bootstrap
+        run: melos bootstrap
+
+      - name: Analyze
+        run: dart analyze .
+        working-directory: packages/${{ matrix.package }}
+
+      - name: Test
+        run: dart test
+        working-directory: packages/${{ matrix.package }}
+
+  test-supabase:
+    name: Test Supabase (optional)
+    runs-on: ubuntu-latest
+    # Supabase packages depend on the supabase pub.dev package which may have
+    # transitive constraints. This job is informational and never blocks the build.
+    continue-on-error: true
+
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - drift_supabase
+          - drift_offline_first_with_supabase
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install melos
+        run: dart pub global activate melos
+
+      - name: Bootstrap
+        run: melos bootstrap
+
+      - name: Analyze
+        run: dart analyze .
+        working-directory: packages/${{ matrix.package }}
+
+      - name: Test
+        run: dart test
+        working-directory: packages/${{ matrix.package }}
+
+  format:
+    name: Format check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - name: Install melos
+        run: dart pub global activate melos
+      - name: Bootstrap
+        run: melos bootstrap
+      - name: Check format
+        run: melos run format -- --set-exit-if-changed

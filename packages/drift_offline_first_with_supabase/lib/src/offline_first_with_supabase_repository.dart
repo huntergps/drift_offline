@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:drift_offline_first/drift_offline_first.dart';
 import 'package:drift_supabase/drift_supabase.dart';
 import 'package:http/http.dart' as http;
-import 'package:logging/logging.dart';
 import 'package:meta/meta.dart';
 import 'package:supabase/supabase.dart';
 
@@ -141,15 +140,16 @@ abstract class OfflineFirstWithSupabaseRepository<
         repository: this,
       );
 
-      for (final model in results) {
-        await upsertLocal<T>(model);
+      if (!deserializeLocal) {
+        for (final model in results) {
+          await upsertLocal<T>(model);
+        }
+        unawaited(notifySubscriptionsWithLocalData<T>(query: query));
+        return results;
       }
-
-      // ignore: discarded_futures
-      notifySubscriptionsWithLocalData<T>(query: query);
-
-      if (!deserializeLocal) return results;
-      return getLocal<T>(query: query);
+      // storeRemoteResults persists all models, notifies subscribers,
+      // and returns the re-read local results.
+      return storeRemoteResults<T>(results, query: query);
     } on SocketException catch (e) {
       logger.warning('#hydrateRemote socket failure: $e');
       return deserializeLocal ? getLocal<T>(query: query) : [];
@@ -173,7 +173,7 @@ abstract class OfflineFirstWithSupabaseRepository<
       // Mark this record so realtime doesn't double-process it.
       // We use the adapter to get the serialized form for key extraction.
       final adapter = modelDictionary.adapterFor[T];
-      if (adapter != null && updated != null) {
+      if (adapter != null) {
         final serialized = await adapter.toSupabase(
           updated,
           provider: supabaseProvider,
@@ -209,11 +209,20 @@ abstract class OfflineFirstWithSupabaseRepository<
 
   /// Subscribe to Supabase Realtime changes for [T] and upsert/delete locally.
   ///
+  /// Handles three event types:
+  /// - **INSERT / UPDATE**: deserializes `newRecord` and upserts locally.
+  ///   Deduplicated against recent local writes to prevent echo updates.
+  /// - **DELETE**: deletes the local record using `oldRecord` data.
+  ///   When `oldRecord` is empty (table REPLICA IDENTITY is not FULL),
+  ///   falls back to a full [reconcileWithRemote] to remove stale locals.
+  /// - **ALL** (synthetic full-refresh event): triggers [reconcileWithRemote]
+  ///   to diff the complete remote set against local and delete stale records.
+  ///
   /// Returns the [RealtimeChannel] so the caller can cancel with [cancelRealtime].
   RealtimeChannel subscribeToRealtime<T extends TRepositoryModel>({
     String? schema,
     String? filter,
-    void Function(T model, RealtimePostgresChangesPayload event)? onUpdate,
+    void Function(T model, PostgresChangePayload event)? onUpdate,
   }) {
     final adapter = modelDictionary.adapterFor[T];
     if (adapter == null) throw StateError('No adapter registered for $T');
@@ -224,21 +233,40 @@ abstract class OfflineFirstWithSupabaseRepository<
       event: PostgresChangeEvent.all,
       schema: schema ?? 'public',
       table: adapter.supabaseTableName,
-      filter: filter != null ? PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: filter.split('=').first, value: filter.split('=').last) : null,
+      filter: filter != null
+          ? PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: filter.split('=').first,
+              value: filter.split('=').last,
+            )
+          : null,
       callback: (payload) async {
         try {
           if (payload.eventType == PostgresChangeEvent.delete) {
-            // Best-effort local delete using old record data.
             final oldData = payload.oldRecord;
             if (oldData.isNotEmpty) {
+              // Targeted delete using the old record's data.
               final model = await adapter.fromSupabase(
                 oldData,
                 provider: supabaseProvider,
                 repository: this,
               ) as T;
               await deleteLocal<T>(model);
+            } else {
+              // oldRecord is empty — REPLICA IDENTITY is not FULL.
+              // Fall back to full reconciliation to remove the stale local record.
+              logger.fine(
+                'subscribeToRealtime: DELETE with empty oldRecord for $T, '
+                'running reconcileWithRemote',
+              );
+              await reconcileWithRemote<T>();
             }
+          } else if (payload.eventType == PostgresChangeEvent.all) {
+            // Synthetic full-refresh event: diff remote vs local and delete extras.
+            logger.fine('subscribeToRealtime: full-refresh event for $T, reconciling');
+            await reconcileWithRemote<T>();
           } else {
+            // INSERT or UPDATE.
             final newData = payload.newRecord;
 
             // DEDUPLICATION: skip if this record was just written locally.
@@ -263,6 +291,49 @@ abstract class OfflineFirstWithSupabaseRepository<
 
     channel.subscribe();
     return channel;
+  }
+
+  /// Fetch all [T] records from Supabase and delete any local records that no
+  /// longer exist on the server.
+  ///
+  /// This implements a "server wins" set reconciliation useful after:
+  /// - Reconnecting after an extended offline period (missed DELETE events).
+  /// - Receiving a Supabase Realtime `PostgresChangeEvent.all` event.
+  /// - Receiving a DELETE event with an empty `oldRecord` (no REPLICA IDENTITY FULL).
+  ///
+  /// **Requirement:** models must override [OfflineFirstModel.primaryKey] to
+  /// return a non-null unique identifier. Records with `primaryKey == null` are
+  /// skipped during the diff.
+  ///
+  /// ```dart
+  /// // Call after reconnection:
+  /// await repository.reconcileWithRemote<Partner>();
+  /// ```
+  Future<void> reconcileWithRemote<T extends TRepositoryModel>({
+    Query? query,
+  }) async {
+    logger.fine('#reconcileWithRemote: $T');
+
+    // hydrateRemote fetches remote, upserts all locally, returns re-read locals.
+    final remoteModels = await hydrateRemote<T>(query: query);
+    final localModels = await getLocal<T>(query: query);
+
+    // Build the set of remote primary keys for fast lookup.
+    final remotePrimaryKeys = remoteModels
+        .map((m) => m.primaryKey)
+        .whereType<Object>()
+        .toSet();
+
+    // Delete any local record whose primary key is not in the remote set.
+    for (final local in localModels) {
+      final pk = local.primaryKey;
+      if (pk != null && !remotePrimaryKeys.contains(pk)) {
+        logger.fine('#reconcileWithRemote: deleting stale local $T pk=$pk');
+        await deleteLocal<T>(local);
+      }
+    }
+
+    await notifySubscriptionsWithLocalData<T>(query: query);
   }
 
   /// Cancel a realtime subscription.

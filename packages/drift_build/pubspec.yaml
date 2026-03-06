@@ -1,11 +1,14 @@
 name: drift_build
 description: Code generation infrastructure for drift_offline packages. Replaces brick_build with no external framework dependency.
 version: 0.1.0
+homepage: https://github.com/huntergps/drift_offline
+repository: https://github.com/huntergps/drift_offline
+issue_tracker: https://github.com/huntergps/drift_offline/issues
+# publish_to: none — path: dependencies must be replaced with version refs before publishing.
+publish_to: none
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
-
-publish_to: none
 
 dependencies:
   analyzer: ">=6.0.0 <9.0.0"

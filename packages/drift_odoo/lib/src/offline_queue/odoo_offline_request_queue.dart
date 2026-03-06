@@ -69,9 +69,18 @@ class OdooOfflineRequestQueue {
 
     _logger.info('Processing queued: $method $model ids=$ids');
 
+    // Calling client.call() re-routes through OdooOfflineQueueClient, which:
+    //   1. Calls insertOrUpdate() — finds the existing row by (model+method+ids+payload)
+    //      and increments its attempt counter. Returns the same rowId.
+    //   2. Calls the live HTTP endpoint.
+    //   3a. On success  → calls delete(rowId), removing the job from the queue.
+    //   3b. On SocketException → calls unlock(rowId), then returns null (no throw).
+    //   3c. On other errors → calls unlock(rowId), then rethrows.
+    //
+    // The catch block here handles case 3c only (unlock was already called by
+    // client.call(), so a second unlock is benign).
     try {
       await client.call(model, method, ids: ids, kwargs: kwargs);
-      // Success — client.call already removes from queue on success
     } catch (e) {
       _logger.warning('Queue transmit failed: $method $model: $e');
       await client.requestManager.unlock(rowId);

@@ -17,15 +17,33 @@ scripts:
   analyze:
     run: >
       melos exec
-      --ignore="drift_rest_generators"
       --ignore="drift_supabase_generators"
-      --ignore="drift_offline_first_with_rest_build"
       --ignore="drift_offline_first_with_supabase_build"
       --ignore="drift_supabase"
       --ignore="drift_offline_first_with_supabase"
       --ignore="example_odoo_contacts"
       -- dart analyze .
-    description: Run dart analyzer on stable packages (REST/Supabase generators, Supabase provider, and example app are WIP)
+    description: Run dart analyzer on stable packages (Supabase packages excluded pending supabase pub.dev dep validation)
+
+  analyze-rest:
+    run: >
+      melos exec
+      --scope="drift_rest"
+      --scope="drift_rest_generators"
+      --scope="drift_offline_first_with_rest"
+      --scope="drift_offline_first_with_rest_build"
+      -- dart analyze .
+    description: Analyze REST packages (separate from main analyze to track REST stability)
+
+  analyze-supabase:
+    run: >
+      melos exec
+      --scope="drift_supabase"
+      --scope="drift_supabase_generators"
+      --scope="drift_offline_first_with_supabase"
+      --scope="drift_offline_first_with_supabase_build"
+      -- dart analyze .
+    description: Analyze Supabase packages (requires supabase pub.dev package)
 
   test:
     run: melos exec -- dart test

@@ -100,16 +100,21 @@ abstract class OfflineFirstWithOdooRepository<
         (r) => adapter.fromOdoo(r, provider: remoteProvider, repository: this) as Future<T>,
       ));
 
-      // Upsert to local storage
-      for (final model in models) {
-        await upsertLocal<T>(model);
+      if (!deserializeLocal) {
+        // Persist without re-reading from local storage.
+        for (final model in models) {
+          await upsertLocal<T>(model);
+        }
+        await syncManager.updateLastSync(adapter.odooModel);
+        unawaited(notifySubscriptionsWithLocalData<T>(query: localQuery));
+        return models;
       }
 
-      // Update sync timestamp
+      // storeRemoteResults persists all models, notifies subscribers,
+      // and returns the re-read local results.
+      final result = await storeRemoteResults<T>(models, query: localQuery);
       await syncManager.updateLastSync(adapter.odooModel);
-
-      if (!deserializeLocal) return models;
-      return getLocal<T>(query: localQuery);
+      return result;
     } on SocketException catch (e) {
       logger.warning('#hydrateRemote socket failure: $e');
       return deserializeLocal ? getLocal<T>(query: localQuery) : [];

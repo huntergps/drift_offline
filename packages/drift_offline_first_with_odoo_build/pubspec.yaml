@@ -1,11 +1,14 @@
 name: drift_offline_first_with_odoo_build
 description: Code generation builders for drift_offline_first_with_odoo. Generates fromOdoo/toOdoo adapters and model dictionaries.
 version: 0.1.0
+homepage: https://github.com/huntergps/drift_offline
+repository: https://github.com/huntergps/drift_offline
+issue_tracker: https://github.com/huntergps/drift_offline/issues
+# publish_to: none — path: dependencies must be replaced with version refs before publishing.
+publish_to: none
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
-
-publish_to: none
 
 dependencies:
   analyzer: ">=6.0.0 <9.0.0"
@@ -26,5 +29,6 @@ dependencies:
   source_gen: ">=1.0.0 <4.0.0"
 
 dev_dependencies:
+  build_test: ">=2.0.0 <4.0.0"
   lints:
-  test:
+  test: ">=1.24.0 <2.0.0"

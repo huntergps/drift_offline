@@ -69,14 +69,16 @@ abstract class OfflineFirstWithRestRepository
   }) async {
     try {
       final remoteModels = await remoteGet<T>(query: query);
-      for (final model in remoteModels) {
-        await upsertLocal(model);
+      if (!deserializeLocal) {
+        for (final model in remoteModels) {
+          await upsertLocal(model);
+        }
+        unawaited(notifySubscriptionsWithLocalData<T>(query: query));
+        return remoteModels;
       }
-      // Notify subscribers after bulk hydration
-      // ignore: discarded_futures
-      notifySubscriptionsWithLocalData<T>(query: query);
-      if (!deserializeLocal) return remoteModels;
-      return getLocal<T>(query: query);
+      // storeRemoteResults persists all models, notifies subscribers,
+      // and returns the re-read local results.
+      return storeRemoteResults<T>(remoteModels, query: query);
     } on RestException catch (e) {
       _logger.warning('REST hydration failed', e);
       return deserializeLocal ? getLocal<T>(query: query) : [];

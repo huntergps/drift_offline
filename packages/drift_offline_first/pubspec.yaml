@@ -1,6 +1,9 @@
 name: drift_offline_first
 description: Base offline-first repository for Drift. Provider-agnostic policies, hydration, and subscriptions.
 version: 0.1.0
+homepage: https://github.com/huntergps/drift_offline
+repository: https://github.com/huntergps/drift_offline
+issue_tracker: https://github.com/huntergps/drift_offline/issues
 
 environment:
   sdk: ">=3.4.0 <4.0.0"

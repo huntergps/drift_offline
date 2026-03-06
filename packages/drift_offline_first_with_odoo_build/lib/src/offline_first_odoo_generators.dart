@@ -47,11 +47,21 @@ class _OfflineFirstOdooDeserialize extends OdooDeserialize {
     ];
   }
 
-  /// Read `@OfflineFirst(where: {...})` from [field] metadata, or null.
+  /// Read `@OfflineFirst` from [field] metadata.
+  ///
+  /// Returns the `where` map when the annotation is present and
+  /// `applyToRemoteDeserialization` is `true` (the default).
+  /// Returns `null` when the annotation is absent, has no `where`, or
+  /// explicitly opts out of remote deserialization.
   Map<String, String>? _offlineFirstWhere(FieldElement field) {
     final annotation = _offlineFirstChecker.firstAnnotationOfExact(field);
     if (annotation == null) return null;
     final reader = ConstantReader(annotation);
+
+    // Respect applyToRemoteDeserialization: false → skip remote override.
+    final applyToRemote = reader.peek('applyToRemoteDeserialization')?.boolValue ?? true;
+    if (!applyToRemote) return null;
+
     final whereValue = reader.peek('where');
     if (whereValue == null || whereValue.isNull) return null;
     return whereValue.mapValue.map(

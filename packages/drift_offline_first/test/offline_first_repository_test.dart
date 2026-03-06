@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift_offline_first/drift_offline_first.dart';
@@ -118,6 +119,36 @@ void main() {
       );
 
       expect(results.single.name, 'CachedOnly');
+    });
+
+    test('alwaysHydrate: always contacts remote even when local data exists', () async {
+      // Unlike awaitRemoteWhenNoneExist, alwaysHydrate triggers background
+      // hydration regardless of whether local data already exists.
+      final repo = _Repo(
+        local: [const _Item(1, 'Stale')],
+        remote: [const _Item(1, 'Fresh')],
+      );
+
+      await repo.get<_Item>(policy: OfflineFirstGetPolicy.alwaysHydrate);
+      // Allow background hydration to complete
+      await Future<void>.delayed(Duration.zero);
+
+      // Local is updated by the background hydration
+      expect(repo.local.single.name, 'Fresh');
+    });
+
+    test('awaitRemoteWhenNoneExist: skips remote when local data already exists', () async {
+      // Verifies the contrast with alwaysHydrate: remote is never contacted.
+      final repo = _Repo(
+        local: [const _Item(1, 'Local')],
+        remote: [const _Item(1, 'Remote')],
+      );
+
+      await repo.get<_Item>(policy: OfflineFirstGetPolicy.awaitRemoteWhenNoneExist);
+      await Future<void>.delayed(Duration.zero);
+
+      // Local is NOT updated — remote was never contacted
+      expect(repo.local.single.name, 'Local');
     });
 
     test('memoryCacheProvider: returns cached items on second call', () async {
@@ -258,6 +289,114 @@ void main() {
     test('returns false when local is empty', () async {
       final repo = _Repo();
       expect(await repo.exists<_Item>(), isFalse);
+    });
+  });
+
+  // watchLocal tests defined below
+  watchLocalTests();
+}
+
+// ── watchLocal override tests ─────────────────────────────────────────────────
+
+/// Repository that overrides [watchLocal] to simulate Drift's auto-emit
+/// behavior: each call to [upsertLocal]/[deleteLocal] pushes a new list
+/// into a dedicated [StreamController] without needing
+/// [notifySubscriptionsWithLocalData].
+class _DriftWatchRepo extends _Repo {
+  final _controller = StreamController<List<_Item>>.broadcast();
+
+  _DriftWatchRepo({List<_Item>? local, List<_Item>? remote})
+      : super(local: local ?? [], remote: remote ?? []);
+
+  /// Emit the current local list every time the "DB" changes.
+  void _emit() => _controller.add(List.of(local));
+
+  @override
+  Future<int?> upsertLocal<T extends _Item>(T instance) async {
+    final result = await super.upsertLocal<T>(instance);
+    _emit(); // simulate Drift's automatic table-change notification
+    return result;
+  }
+
+  @override
+  Future<void> deleteLocal<T extends _Item>(T instance) async {
+    await super.deleteLocal<T>(instance);
+    _emit();
+  }
+
+  @override
+  Stream<List<T>> watchLocal<T extends _Item>({Query? query}) {
+    return _controller.stream.cast<List<T>>();
+  }
+
+  Future<void> dispose() => _controller.close();
+}
+
+void watchLocalTests() {
+  group('watchLocal override (simulated Drift watch)', () {
+    test('subscribe() uses watchLocal when overridden', () async {
+      final repo = _DriftWatchRepo(local: [const _Item(1, 'Initial')]);
+
+      // Prime the stream with current data
+      final emitted = <List<_Item>>[];
+      final sub = repo.subscribe<_Item>().listen(emitted.add);
+
+      // upsertLocal triggers auto-emit (no manual notify needed)
+      await repo.upsertLocal(const _Item(2, 'Added'));
+
+      await Future<void>.delayed(Duration.zero);
+      expect(emitted, hasLength(1));
+      expect(emitted.first.map((i) => i.name), containsAll(['Initial', 'Added']));
+
+      await sub.cancel();
+      await repo.dispose();
+    });
+
+    test('notifySubscriptionsWithLocalData is a no-op when watchLocal is overridden', () async {
+      final repo = _DriftWatchRepo(local: [const _Item(1, 'A')]);
+      final emitted = <List<_Item>>[];
+      final sub = repo.subscribe<_Item>().listen(emitted.add);
+
+      // Calling notify doesn't add to the Dart-side StreamController because
+      // watchLocal was overridden — it should not crash.
+      await repo.notifySubscriptionsWithLocalData<_Item>();
+
+      await Future<void>.delayed(Duration.zero);
+      // No emission: the base StreamController is never written because
+      // watchLocal bypasses it.
+      expect(emitted, isEmpty);
+
+      await sub.cancel();
+      await repo.dispose();
+    });
+
+    test('deleteLocal triggers auto-emit', () async {
+      final repo = _DriftWatchRepo(local: [
+        const _Item(1, 'Keep'),
+        const _Item(2, 'Remove'),
+      ]);
+      final emitted = <List<_Item>>[];
+      final sub = repo.subscribe<_Item>().listen(emitted.add);
+
+      await repo.deleteLocal(const _Item(2, 'Remove'));
+
+      await Future<void>.delayed(Duration.zero);
+      expect(emitted, hasLength(1));
+      expect(emitted.first.map((i) => i.id), [1]);
+
+      await sub.cancel();
+      await repo.dispose();
+    });
+
+    test('base watchLocal (StreamController) still works without override', () async {
+      final repo = _Repo(local: [const _Item(1, 'Base')]);
+      final stream = repo.subscribe<_Item>();
+      final future = stream.first;
+
+      await repo.notifySubscriptionsWithLocalData<_Item>();
+
+      final result = await future;
+      expect(result.single.name, 'Base');
     });
   });
 }

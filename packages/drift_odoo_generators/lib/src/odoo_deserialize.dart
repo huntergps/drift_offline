@@ -1,8 +1,12 @@
 import 'package:analyzer/dart/element/element.dart';
 import 'package:drift_build/generators.dart';
 import 'package:drift_odoo_core/drift_odoo_core.dart';
+import 'package:drift_offline_first/drift_offline_first.dart';
+import 'package:source_gen/source_gen.dart';
 
 import 'odoo_serdes_generator.dart';
+
+const _offlineFirstChecker = TypeChecker.fromRuntime(OfflineFirst);
 
 /// Generates the `fromOdoo(Map<String, dynamic> data)` function for a model.
 ///
@@ -103,19 +107,25 @@ class OdooDeserialize extends OdooSerdesGenerator {
       return "Map<String, dynamic>.from($raw as Map)";
     }
 
-    // Iterable (One2many / Many2many)
+    // Iterable (One2many / Many2many) — Odoo returns [id1, id2, ...]
     if (checker.isIterable) {
       if (checker.isArgTypeASibling) {
+        // Check for @OfflineFirst(where:) override first.
+        final customWhere = _offlineFirstWhereFor(field);
+        if (customWhere != null) {
+          return _generateIterableWhereAssociation(checker, customWhere);
+        }
+
         final argType = checker.unFuturedArgType.toString().replaceAll('?', '');
         if (checker.isNullable) {
           return "$raw == false || $raw == null ? null "
               ": await repository?.getAssociation<$argType>("
-              "Query.where('odooId', Where.exactList(($raw as List).cast<int>()))) "
+              "Query(where: [Where('odooId').isIn(($raw as List).cast<dynamic>())])) "
               "?? <$argType>[]";
         }
         final repoAccess = repositoryNonNullAccess;
         return "await $repoAccess.getAssociation<$argType>("
-            "Query.where('odooId', Where.exactList(($raw as List).cast<int>())))"
+            "Query(where: [Where('odooId').isIn(($raw as List).cast<dynamic>())]))"
             ".then((r) => r ?? <$argType>[])";
       }
       final argType = checker.unFuturedArgType.toString().replaceAll('?', '');
@@ -127,16 +137,24 @@ class OdooDeserialize extends OdooSerdesGenerator {
 
     // Many2one sibling — Odoo returns [id, display_name]
     if (checker.isSibling) {
+      // Check for @OfflineFirst(where:) override first.
+      final customWhere = _offlineFirstWhereFor(field);
+      if (customWhere != null) {
+        return _generateSiblingWhereAssociation(checker, customWhere);
+      }
+
       final siblingType = checker.unFuturedType.toString().replaceAll('?', '');
       if (checker.isNullable) {
         return "$raw == false || $raw == null ? null "
             ": await repository?.getAssociation<$siblingType>("
-            "Query.where('odooId', ($raw as List).first as int, limit1: true))"
+            "Query(where: [Where.exact('odooId', ($raw as List).first as int)], "
+            "limitBy: LimitBy(1)))"
             "?.then((r) => r?.isEmpty ?? true ? null : r!.first)";
       }
       final repoAccess = repositoryNonNullAccess;
       return "await $repoAccess.getAssociation<$siblingType>("
-          "Query.where('odooId', ($raw as List).first as int, limit1: true))"
+          "Query(where: [Where.exact('odooId', ($raw as List).first as int)], "
+          "limitBy: LimitBy(1)))"
           ".then((r) => r!.first)";
     }
 
@@ -144,5 +162,65 @@ class OdooDeserialize extends OdooSerdesGenerator {
       return "$raw == false ? null : $raw";
     }
     return raw;
+  }
+
+  // ---------------------------------------------------------------------------
+  // @OfflineFirst(where:) helpers
+  // ---------------------------------------------------------------------------
+
+  /// Returns the `where` map from `@OfflineFirst` on [field] if the annotation
+  /// is present, has a non-null `where`, and `applyToRemoteDeserialization`
+  /// is `true`. Returns `null` otherwise (use default Odoo lookup).
+  Map<String, String>? _offlineFirstWhereFor(FieldElement field) {
+    final annotation = _offlineFirstChecker.firstAnnotationOfExact(field);
+    if (annotation == null) return null;
+
+    final applyToRemote =
+        annotation.getField('applyToRemoteDeserialization')?.toBoolValue() ?? true;
+    if (!applyToRemote) return null;
+
+    final whereValue = annotation.getField('where')?.toMapValue();
+    if (whereValue == null || whereValue.isEmpty) return null;
+
+    return whereValue.map(
+      (k, v) => MapEntry(k!.toStringValue()!, v!.toStringValue()!),
+    );
+  }
+
+  /// Generates a `getAssociation` call for a Many2one sibling field using a
+  /// custom `where` map from `@OfflineFirst(where: {...})`.
+  String _generateSiblingWhereAssociation(
+    SharedChecker<dynamic> checker,
+    Map<String, String> where,
+  ) {
+    final clauses = where.entries.map((e) => "Where.exact('${e.key}', ${e.value})").join(', ');
+    final siblingType = checker.unFuturedType.toString().replaceAll('?', '');
+    if (checker.isNullable) {
+      return "await repository?.getAssociation<$siblingType>("
+          "Query(where: [$clauses], limitBy: LimitBy(1)))"
+          "?.then((r) => r?.isEmpty ?? true ? null : r!.first)";
+    }
+    final repoAccess = repositoryNonNullAccess;
+    return "await $repoAccess.getAssociation<$siblingType>("
+        "Query(where: [$clauses], limitBy: LimitBy(1)))"
+        ".then((r) => r!.first)";
+  }
+
+  /// Generates a `getAssociation` call for an iterable sibling field using a
+  /// custom `where` map from `@OfflineFirst(where: {...})`.
+  String _generateIterableWhereAssociation(
+    SharedChecker<dynamic> checker,
+    Map<String, String> where,
+  ) {
+    final clauses = where.entries.map((e) => "Where.exact('${e.key}', ${e.value})").join(', ');
+    final argType = checker.unFuturedArgType.toString().replaceAll('?', '');
+    if (checker.isNullable) {
+      return "await repository?.getAssociation<$argType>("
+          "Query(where: [$clauses])) ?? <$argType>[]";
+    }
+    final repoAccess = repositoryNonNullAccess;
+    return "await $repoAccess.getAssociation<$argType>("
+        "Query(where: [$clauses]))"
+        ".then((r) => r ?? <$argType>[])";
   }
 }

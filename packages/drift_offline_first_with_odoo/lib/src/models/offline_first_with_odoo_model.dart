@@ -17,7 +17,17 @@ import 'package:drift_odoo_core/drift_odoo_core.dart';
 /// ```
 abstract class OfflineFirstWithOdooModel extends OfflineFirstModel
     implements OdooModel {
-  /// The server-side Odoo record ID. Null before the first successful create.
+  /// The server-side Odoo record ID (`null` before the first successful create).
+  ///
+  /// This field is **intentionally mutable**: [OfflineFirstWithOdooRepository.upsertRemote]
+  /// sets it after a successful `create` call so the in-memory instance stays
+  /// consistent without requiring a full local re-read.
+  ///
+  /// Contract:
+  /// - Set by the framework after a successful remote `create`. Do not set
+  ///   it manually in application code.
+  /// - Once set to a non-null value it should not be changed to a different
+  ///   non-null value (treat it as write-once from the remote perspective).
   @override
   int? odooId;
 

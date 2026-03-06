@@ -187,7 +187,9 @@ class OdooRequestSqliteCacheManager {
         whereArgs: [row[kColId]],
       );
 
-      return Map<String, dynamic>.from(row);
+      // Return the row with locked already reflected — the DB was updated above
+      // but `row` was fetched before the update, so override the field.
+      return {...Map<String, dynamic>.from(row), kColLocked: 1};
     });
   }
 

@@ -45,6 +45,14 @@ abstract class OfflineFirstRepository<TRepositoryModel extends OfflineFirstModel
   /// Subscription broadcast controllers keyed by model [Type] and query string.
   final Map<Type, Map<String, StreamController<List<Object>>>> _subscriptionControllers = {};
 
+  /// Tracks the policy used by the most recent [get] call.
+  ///
+  /// [getAssociation] propagates this policy so that all models in the same
+  /// object graph are hydrated with the same strategy. For example, when
+  /// `get<Order>(policy: awaitRemote)` resolves an associated `Customer`, it
+  /// also fetches the `Customer` from remote instead of falling back to local.
+  OfflineFirstGetPolicy? _latestGetPolicy;
+
   OfflineFirstRepository({
     bool? autoHydrate,
     String? loggerName,
@@ -122,12 +130,31 @@ abstract class OfflineFirstRepository<TRepositoryModel extends OfflineFirstModel
   // Subscriptions
   // ---------------------------------------------------------------------------
 
-  /// Returns a broadcast stream that emits the local model list for [T]
-  /// every time [notifySubscriptionsWithLocalData] is called for [T].
+  /// Returns a reactive stream of local [T] models.
   ///
-  /// Optionally, [query] is used as a key so that multiple independent
-  /// subscriptions for the same type can coexist.
-  Stream<List<T>> subscribe<T extends TRepositoryModel>({Query? query}) {
+  /// The **default implementation** wraps an internal [StreamController] that
+  /// only emits when [notifySubscriptionsWithLocalData] is called explicitly.
+  ///
+  /// **Override this** in Drift-backed repositories to use Drift's native
+  /// `.watch()` — which emits automatically on every DB write without any
+  /// manual notification:
+  ///
+  /// ```dart
+  /// @override
+  /// Stream<List<T>> watchLocal<T extends MyModel>({Query? query}) {
+  ///   if (T == Partner) {
+  ///     return _transformer
+  ///         .applyToWatch(db.select(db.partners), query)
+  ///         .map((rows) => rows.map(rowToPartner).toList().cast<T>());
+  ///   }
+  ///   return super.watchLocal<T>(query: query);
+  /// }
+  /// ```
+  ///
+  /// When overridden with Drift's watch, calls to
+  /// [notifySubscriptionsWithLocalData] become harmless no-ops for that type.
+  @protected
+  Stream<List<T>> watchLocal<T extends TRepositoryModel>({Query? query}) {
     final key = query?.toString() ?? '';
     _subscriptionControllers
         .putIfAbsent(T, () => {})
@@ -135,8 +162,19 @@ abstract class OfflineFirstRepository<TRepositoryModel extends OfflineFirstModel
     return _subscriptionControllers[T]![key]!.stream.cast<List<T>>();
   }
 
-  /// Trigger a subscription notification: fetch current local data for [T]
-  /// and push it to all [subscribe] listeners.
+  /// Returns a stream that emits the local [T] list on every change.
+  ///
+  /// Delegates to [watchLocal]. When [watchLocal] is overridden with Drift's
+  /// `.watch()`, this stream auto-emits on every DB mutation. Otherwise,
+  /// trigger emissions manually via [notifySubscriptionsWithLocalData].
+  Stream<List<T>> subscribe<T extends TRepositoryModel>({Query? query}) =>
+      watchLocal<T>(query: query);
+
+  /// Push the current local [T] data to all [subscribe] listeners.
+  ///
+  /// Only relevant when [watchLocal] uses the default [StreamController]-based
+  /// implementation. When [watchLocal] is overridden with Drift's `.watch()`,
+  /// this is a no-op for that type (Drift emits automatically).
   Future<void> notifySubscriptionsWithLocalData<T extends TRepositoryModel>({
     Query? query,
   }) async {
@@ -161,35 +199,48 @@ abstract class OfflineFirstRepository<TRepositoryModel extends OfflineFirstModel
     bool seedOnly = false,
   }) async {
     logger.finest('#get: $T policy=$policy query=$query');
+    _latestGetPolicy = policy;
+
+    if (forceLocalSyncFromRemote) {
+      logger.warning(
+        '#get: forceLocalSyncFromRemote=true has no effect unless '
+        'DestructiveLocalSyncFromRemoteMixin is mixed into this repository.',
+      );
+    }
 
     final requireRemote = policy == OfflineFirstGetPolicy.awaitRemote;
     final hydrateWhenEmpty = policy == OfflineFirstGetPolicy.awaitRemoteWhenNoneExist;
     final alwaysHydratePolicy = policy == OfflineFirstGetPolicy.alwaysHydrate;
 
+    // Check L1 cache before any I/O — skip only for policies that require fresh remote data.
+    if (!requireRemote && !alwaysHydratePolicy) {
+      final cached = memoryCacheProvider?.getAll<T>();
+      if (cached != null && cached.isNotEmpty) return cached;
+    }
+
     if (requireRemote) {
-      return hydrateRemote<T>(query: query, deserializeLocal: !seedOnly);
+      final results = await hydrateRemote<T>(query: query, deserializeLocal: !seedOnly);
+      _populateCache<T>(results);
+      return results;
     }
 
     final modelExists = await existsLocal<T>(query: query);
 
     if (hydrateWhenEmpty && !modelExists) {
-      return hydrateRemote<T>(query: query, deserializeLocal: !seedOnly);
+      final results = await hydrateRemote<T>(query: query, deserializeLocal: !seedOnly);
+      _populateCache<T>(results);
+      return results;
     }
 
     if (alwaysHydratePolicy) {
-      // Fire-and-forget background hydration
-      unawaited(hydrateRemote<T>(query: query));
+      unawaited(hydrateRemote<T>(query: query).then(_populateCache));
     } else if (autoHydrate) {
-      unawaited(hydrateRemote<T>(query: query));
+      unawaited(hydrateRemote<T>(query: query).then(_populateCache));
     }
 
-    // Return from L1 cache when policy permits (not awaitRemote / alwaysHydrate).
-    if (!alwaysHydratePolicy) {
-      final cached = memoryCacheProvider?.getAll<T>();
-      if (cached != null && cached.isNotEmpty) return cached;
-    }
-
-    return getLocal<T>(query: query);
+    final results = await getLocal<T>(query: query);
+    _populateCache<T>(results);
+    return results;
   }
 
   /// Upsert a model with offline-first semantics.
@@ -290,11 +341,18 @@ abstract class OfflineFirstRepository<TRepositoryModel extends OfflineFirstModel
   // Association helpers
   // ---------------------------------------------------------------------------
 
-  /// Fetch associated [T] models from local storage only (no remote hydration).
+  /// Fetch associated [T] models using the same policy as the enclosing [get] call.
   ///
-  /// Useful inside adapters to resolve foreign-key associations.
+  /// When called from within an adapter's `fromX` method (i.e. during
+  /// deserialization triggered by [get]), the policy set by that [get] call is
+  /// propagated here via [_latestGetPolicy]. This ensures the entire object
+  /// graph is hydrated consistently — e.g. `awaitRemote` on the root model
+  /// also fetches its associations from remote.
+  ///
+  /// Falls back to [OfflineFirstGetPolicy.localOnly] when invoked outside of a
+  /// [get] call (e.g. in tests or background jobs).
   Future<List<T>> getAssociation<T extends TRepositoryModel>(Query query) =>
-      getLocal<T>(query: query);
+      get<T>(query: query, policy: _latestGetPolicy ?? OfflineFirstGetPolicy.localOnly);
 
   /// Convenience: fetch a single associated [T] by exact field match.
   Future<T?> getAssociationOrNull<T extends TRepositoryModel>(
@@ -324,6 +382,13 @@ abstract class OfflineFirstRepository<TRepositoryModel extends OfflineFirstModel
     // ignore: discarded_futures
     notifySubscriptionsWithLocalData<T>(query: query);
     return getLocal<T>(query: query);
+  }
+
+  /// Upsert [results] into the L1 memory cache (no-op when cache is absent).
+  void _populateCache<T extends TRepositoryModel>(List<T> results) {
+    for (final item in results) {
+      memoryCacheProvider?.upsert<T>(item);
+    }
   }
 
   /// Reset all local data and dispose subscription controllers.
