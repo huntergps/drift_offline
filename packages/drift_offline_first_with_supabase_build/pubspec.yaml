@@ -8,7 +8,7 @@ environment:
 publish_to: none
 
 dependencies:
-  analyzer: ">=6.0.0 <7.0.0"
+  analyzer: ">=6.0.0 <12.0.0"
   drift_build:
     path: ../drift_build
   build: ">=2.0.0 <3.0.0"

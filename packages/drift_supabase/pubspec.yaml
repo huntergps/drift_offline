@@ -10,7 +10,7 @@ publish_to: none
 dependencies:
   drift_offline_first:
     path: ../drift_offline_first
-  brick_core: ">=1.0.0 <2.0.0"
+  brick_core: ">=1.0.0 <3.0.0"
   collection: ">=1.15.0 <2.0.0"
   http: ">=1.0.0 <2.0.0"
   logging: ">=1.0.0 <2.0.0"
