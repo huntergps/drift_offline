@@ -2,6 +2,7 @@ import 'package:drift_offline_first/drift_offline_first.dart';
 import 'package:logging/logging.dart';
 import 'package:supabase/supabase.dart';
 
+import 'runtime_supabase_column_definition.dart';
 import 'supabase_adapter.dart';
 import 'supabase_model.dart';
 import 'supabase_model_dictionary.dart';
@@ -41,7 +42,7 @@ class SupabaseProvider {
   /// offset are also applied from the [Query] when present.
   Future<List<TModel>> get<TModel extends SupabaseModel>({
     String? selectQuery,
-    PostgrestFilterBuilder Function(PostgrestFilterBuilder)? filter,
+    dynamic Function(dynamic)? filter,
     Query? query,
     Object? repository,
   }) async {
@@ -57,7 +58,7 @@ class SupabaseProvider {
         .from(adapter.supabaseTableName)
         .select(effectiveSelectQuery);
 
-    PostgrestFilterBuilder filterBuilder = baseQuery;
+    dynamic filterBuilder = baseQuery;
 
     // Apply structured Where conditions from Query
     if (query != null && query.hasWhere) {
@@ -134,7 +135,7 @@ class SupabaseProvider {
     final data = await adapter.toSupabase(instance, provider: this, repository: repository);
     var query = client.from(adapter.supabaseTableName).delete();
 
-    PostgrestFilterBuilder filter = query;
+    dynamic filter = query;
     for (final unique in adapter.uniqueFields) {
       final col = adapter.fieldsToSupabaseColumns[unique]?.columnName ?? unique;
       final value = data[col];
@@ -146,12 +147,12 @@ class SupabaseProvider {
 
   /// Check whether any rows matching [filter] exist.
   Future<bool> exists<TModel extends SupabaseModel>({
-    PostgrestFilterBuilder Function(PostgrestFilterBuilder)? filter,
+    dynamic Function(dynamic)? filter,
   }) async {
     final adapter = _adapterFor<TModel>();
     var query = client.from(adapter.supabaseTableName).select('id').limit(1);
 
-    PostgrestFilterBuilder filterQuery = query;
+    dynamic filterQuery = query;
     if (filter != null) filterQuery = filter(filterQuery);
 
     final rows = await filterQuery;
@@ -177,8 +178,8 @@ class SupabaseProvider {
   /// [WherePhrase] with `isRequired=false` is OR (uses `.or(filter_string)`).
   ///
   /// The [fieldsToColumns] map translates Dart field names to Supabase column names.
-  PostgrestFilterBuilder _applyWhereConditions(
-    PostgrestFilterBuilder builder,
+  dynamic _applyWhereConditions(
+    dynamic builder,
     List<WhereCondition> conditions,
     Map<String, RuntimeSupabaseColumnDefinition> fieldsToColumns,
   ) {
@@ -211,8 +212,8 @@ class SupabaseProvider {
     return builder;
   }
 
-  PostgrestFilterBuilder _applyWhere(
-    PostgrestFilterBuilder builder,
+  dynamic _applyWhere(
+    dynamic builder,
     Where where,
     Map<String, RuntimeSupabaseColumnDefinition> fieldsToColumns,
   ) {
@@ -241,7 +242,7 @@ class SupabaseProvider {
         final list = value as List;
         return builder.gte(column, list[0]).lte(column, list[1]);
       case Compare.inIterable:
-        return builder.in_(column, value as List);
+        return builder.inFilter(column, value as List);
     }
   }
 
